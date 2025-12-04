@@ -8,26 +8,24 @@ import os
 from datetime import datetime
 
 # Sayfa Ayarları
-st.set_page_config(page_title="Pro Futbol Analiz", page_icon="⚽", layout="centered")
+st.set_page_config(page_title="Master Bet AI", page_icon="🧠", layout="wide") # Geniş ekran modu
 
 # Uyarıları kapat
 warnings.filterwarnings("ignore")
 
-# --- LOGO ADRESLERİ (İnternetten çekiyoruz) ---
+# --- LOGOLAR ---
 LOGOLAR = {
     "GALATASARAY": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Galatasaray_Sports_Club_Logo.png/600px-Galatasaray_Sports_Club_Logo.png",
     "FENERBAHCE": "https://upload.wikimedia.org/wikipedia/tr/8/86/Fenerbah%C3%A7e_SK.png",
     "BESIKTAS": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Logo_of_Be%C5%9Fikta%C5%9F_JK.svg/800px-Logo_of_Be%C5%9Fikta%C5%9F_JK.svg.png",
     "TRABZONSPOR": "https://upload.wikimedia.org/wikipedia/tr/a/ab/Trabzonspor_Amblemi.png",
     "SAMSUNSPOR": "https://upload.wikimedia.org/wikipedia/tr/e/ef/Samsunspor_logo_2.png",
-    "GENEL": "https://upload.wikimedia.org/wikipedia/tr/archive/f/f1/20220606135805%21TFF_1._Lig_logo.png" # Diğer takımlar için
+    "GENEL": "https://upload.wikimedia.org/wikipedia/tr/archive/f/f1/20220606135805%21TFF_1._Lig_logo.png"
 }
 
 def logo_getir(takim_adi):
-    # Takım isminin içinde anahtar kelime geçiyor mu diye bakar
     for key in LOGOLAR:
-        if key in takim_adi:
-            return LOGOLAR[key]
+        if key in takim_adi: return LOGOLAR[key]
     return LOGOLAR["GENEL"]
 
 def turkce_karakter_duzelt(metin):
@@ -39,11 +37,9 @@ def turkce_karakter_duzelt(metin):
 def verileri_hazirla():
     url = "https://www.tff.org/default.aspx?pageID=198"
     headers = {"User-Agent": "Mozilla/5.0"}
-    
     try:
         response = requests.get(url, headers=headers)
         response.encoding = 'iso-8859-9'
-        
         try:
             html_icerik = StringIO(response.text)
             tablolar = pd.read_html(html_icerik)
@@ -79,10 +75,8 @@ def verileri_hazirla():
                     atilan = temiz_sayilar[-4]
                     yenilen = temiz_sayilar[-3]
                     mac_sayisi = temiz_sayilar[1]
-                    
                     temiz_ad = ''.join([i for i in takim_adi if not i.isdigit()]).replace('.', '').replace('A.Ş.', '').strip()
                     evrensel_ad = turkce_karakter_duzelt(temiz_ad)
-                    
                     takimlar[evrensel_ad] = {'O': mac_sayisi, 'A': atilan, 'Y': yenilen}
                     toplam_mac += mac_sayisi
                     toplam_gol += atilan
@@ -97,7 +91,6 @@ def verileri_hazirla():
                 'Hucum': (veri['A'] / veri['O']) / lig_ort,
                 'Defans': (veri['Y'] / veri['O']) / lig_ort
             }
-            
         return guc_tablosu, lig_ort
 
     except Exception as e:
@@ -105,33 +98,44 @@ def verileri_hazirla():
         return None, None
 
 # --- ARAYÜZ ---
-# Banner Resmi
-st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Football_iu_1996.jpg/1200px-Football_iu_1996.jpg", use_container_width=True)
+c1, c2 = st.columns([1, 5])
+with c1:
+    st.image("https://cdn-icons-png.flaticon.com/512/2643/2643509.png", width=80)
+with c2:
+    st.title("Master Bet AI - Bahis Mühendisi")
+    st.markdown("Yapay Zeka Tahminleri + **Value Bet Analizi** + **Kelly Kriteri**")
 
-st.title("⚽ Pro Futbol İddaa Analisti")
-st.markdown("---")
-
-with st.spinner('TFF verileri ve logolar yükleniyor...'):
+with st.spinner('Veriler Güncelleniyor...'):
     guc_tablosu, lig_ort = verileri_hazirla()
 
 if guc_tablosu:
     takim_listesi = sorted(list(guc_tablosu.keys()))
 
-    # --- SOL PANEL ---
-    st.sidebar.header("⚙️ Maç Ayarları")
+    # --- SOL PANEL (AYARLAR) ---
+    st.sidebar.header("⚙️ Analiz Parametreleri")
+    
+    st.sidebar.subheader("1. Takım Seçimi")
     ev_sahibi = st.sidebar.selectbox("🏠 Ev Sahibi", takim_listesi, index=0)
     deplasman = st.sidebar.selectbox("✈️ Deplasman", takim_listesi, index=1)
     
-    st.sidebar.divider()
-    st.sidebar.write("📊 **Form Durumu (Son 5 Maç)**")
-    ev_form = st.sidebar.slider(f"{ev_sahibi}", 0, 5, 3)
-    dep_form = st.sidebar.slider(f"{deplasman}", 0, 5, 3)
+    st.sidebar.subheader("2. Detaylar")
+    ev_form = st.sidebar.slider(f"{ev_sahibi} Form (0-5)", 0, 5, 3)
+    dep_form = st.sidebar.slider(f"{deplasman} Form (0-5)", 0, 5, 3)
+    ev_eksik = st.sidebar.checkbox(f"{ev_sahibi} Eksik Var", False)
+    dep_eksik = st.sidebar.checkbox(f"{deplasman} Eksik Var", False)
     
-    st.sidebar.write("🚑 **Eksik Oyuncu**")
-    ev_eksik = st.sidebar.checkbox(f"{ev_sahibi} eksik var", value=False)
-    dep_eksik = st.sidebar.checkbox(f"{deplasman} eksik var", value=False)
+    st.sidebar.divider()
+    
+    # YENİ EKLENEN KISIM: BAHİS ORANLARI
+    st.sidebar.subheader("💰 Bahis Oranları (Bültenden Gir)")
+    oran_1 = st.sidebar.number_input("Ev Sahibi (1) Oranı", min_value=1.01, value=2.10, step=0.05)
+    oran_0 = st.sidebar.number_input("Beraberlik (0) Oranı", min_value=1.01, value=3.20, step=0.05)
+    oran_2 = st.sidebar.number_input("Deplasman (2) Oranı", min_value=1.01, value=2.80, step=0.05)
+    
+    st.sidebar.divider()
+    kasa = st.sidebar.number_input("💼 Toplam Kasan (TL)", min_value=100, value=1000, step=100)
 
-    if st.button("🔥 MAÇI ANALİZ ET", type="primary", use_container_width=True):
+    if st.button("🚀 BÜYÜK ANALİZİ BAŞLAT", type="primary", use_container_width=True):
         if ev_sahibi == deplasman:
             st.error("Aynı takımı seçemezsin!")
         else:
@@ -139,7 +143,6 @@ if guc_tablosu:
             ev_stats = guc_tablosu[ev_sahibi]
             dep_stats = guc_tablosu[deplasman]
             
-            # Katsayılar
             ev_guc = 1 + ((ev_form - 2.5) * 0.05)
             dep_guc = 1 + ((dep_form - 2.5) * 0.05)
             if ev_eksik: ev_guc *= 0.85
@@ -151,84 +154,139 @@ if guc_tablosu:
             # SİMÜLASYON
             ms_sayac = {'1':0, '0':0, '2':0}
             iy_ms_sayac = {}
-            alt_ust_sayac = {'ALT':0, 'UST':0}
             skor_sayac = {}
+            alt_ust = {'UST':0, 'ALT':0}
             
-            for _ in range(5000):
-                e_gol_top = np.random.poisson(ev_xg)
-                d_gol_top = np.random.poisson(dep_xg)
-                e_gol_iy = np.random.binomial(e_gol_top, 0.45)
-                d_gol_iy = np.random.binomial(d_gol_top, 0.45)
+            sim_sayisi = 5000
+            for _ in range(sim_sayisi):
+                e_gol = np.random.poisson(ev_xg)
+                d_gol = np.random.poisson(dep_xg)
                 
-                # Sonuçlar
-                if e_gol_iy > d_gol_iy: iy = '1'
-                elif d_gol_iy > e_gol_iy: iy = '2'
-                else: iy = '0'
-                
-                if e_gol_top > d_gol_top: ms = '1'
-                elif d_gol_top > e_gol_top: ms = '2'
-                else: ms = '0'
-                
+                # MS
+                if e_gol > d_gol: ms='1'
+                elif d_gol > e_gol: ms='2'
+                else: ms='0'
                 ms_sayac[ms] += 1
+                
+                # İY (Basit model)
+                e_iy = np.random.binomial(e_gol, 0.45)
+                d_iy = np.random.binomial(d_gol, 0.45)
+                if e_iy > d_iy: iy='1'
+                elif d_iy > e_iy: iy='2'
+                else: iy='0'
+                
                 iy_ms_key = f"{iy}/{ms}"
                 iy_ms_sayac[iy_ms_key] = iy_ms_sayac.get(iy_ms_key, 0) + 1
                 
-                if (e_gol_top + d_gol_top) > 2.5: alt_ust_sayac['UST'] += 1
-                else: alt_ust_sayac['ALT'] += 1
-                
-                skor_key = f"{e_gol_top}-{d_gol_top}"
+                skor_key = f"{e_gol}-{d_gol}"
                 skor_sayac[skor_key] = skor_sayac.get(skor_key, 0) + 1
+                
+                if (e_gol+d_gol) > 2.5: alt_ust['UST'] += 1
+                else: alt_ust['ALT'] += 1
 
-            # --- GÖRSEL SONUÇ EKRANI ---
-            col_ev, col_orta, col_dep = st.columns([1, 0.5, 1])
+            # --- ANALİZ SONUÇLARI ---
             
-            with col_ev:
+            # 1. BAŞLIK VE SKOR
+            colA, colB, colC = st.columns([1, 0.8, 1])
+            with colA:
                 st.image(logo_getir(ev_sahibi), width=100)
-                st.subheader(ev_sahibi)
-                st.metric("Gol Beklentisi", f"{ev_xg:.2f}")
-
-            with col_orta:
+                st.markdown(f"### {ev_sahibi}")
+                st.info(f"xG: {ev_xg:.2f}")
+            with colB:
                 st.write("# VS")
-
-            with col_dep:
+            with colC:
                 st.image(logo_getir(deplasman), width=100)
-                st.subheader(deplasman)
-                st.metric("Gol Beklentisi", f"{dep_xg:.2f}")
+                st.markdown(f"### {deplasman}")
+                st.info(f"xG: {dep_xg:.2f}")
+
+            st.divider()
+
+            # 2. OLASILIKLAR VE VALUE BET ANALİZİ
+            prob_1 = ms_sayac['1'] / sim_sayisi
+            prob_0 = ms_sayac['0'] / sim_sayisi
+            prob_2 = ms_sayac['2'] / sim_sayisi
+            
+            # Adil Oranlar (1 / Olasılık)
+            fair_1 = 1 / prob_1 if prob_1 > 0 else 99
+            fair_0 = 1 / prob_0 if prob_0 > 0 else 99
+            fair_2 = 1 / prob_2 if prob_2 > 0 else 99
+            
+            st.subheader("💰 VALUE BET (Değerli Bahis) ANALİZİ")
+            st.caption("Eğer Yapay Zeka Oranı < Bahis Sitesi Oranı ise, bu bir FIRSAT bahsidir.")
+            
+            cols = st.columns(3)
+            
+            # EV SAHİBİ ANALİZİ
+            with cols[0]:
+                st.markdown(f"**{ev_sahibi} Kazanır**")
+                st.progress(prob_1)
+                st.write(f"YZ Olasılığı: **%{prob_1*100:.1f}**")
+                st.write(f"Adil Oran: **{fair_1:.2f}**")
+                st.write(f"Site Oranı: **{oran_1:.2f}**")
+                
+                if oran_1 > fair_1:
+                    deger = ((oran_1 * prob_1) - 1) * 100
+                    st.success(f"🔥 VALUE VAR! (Değer: %{deger:.1f})")
+                    # Kelly Kriteri (Basitleştirilmiş: Kasadan ne kadar basmalı?)
+                    # (Oran * Olasılık - 1) / (Oran - 1)
+                    kelly = (((oran_1 * prob_1) - 1) / (oran_1 - 1)) * 0.5 # %50 güvenli Kelly
+                    if kelly > 0:
+                        st.write(f"💵 Önerilen Bahis: **{int(kasa * kelly)} TL**")
+                else:
+                    st.error("Değersiz Oran (Oynama)")
+
+            # BERABERLİK ANALİZİ
+            with cols[1]:
+                st.markdown(f"**Beraberlik**")
+                st.progress(prob_0)
+                st.write(f"YZ Olasılığı: **%{prob_0*100:.1f}**")
+                st.write(f"Adil Oran: **{fair_0:.2f}**")
+                st.write(f"Site Oranı: **{oran_0:.2f}**")
+                
+                if oran_0 > fair_0:
+                    deger = ((oran_0 * prob_0) - 1) * 100
+                    st.success(f"🔥 VALUE! (%{deger:.1f})")
+                    kelly = (((oran_0 * prob_0) - 1) / (oran_0 - 1)) * 0.5
+                    if kelly > 0:
+                        st.write(f"💵 Önerilen: **{int(kasa * kelly)} TL**")
+                else:
+                    st.error("Değersiz")
+
+            # DEPLASMAN ANALİZİ
+            with cols[2]:
+                st.markdown(f"**{deplasman} Kazanır**")
+                st.progress(prob_2)
+                st.write(f"YZ Olasılığı: **%{prob_2*100:.1f}**")
+                st.write(f"Adil Oran: **{fair_2:.2f}**")
+                st.write(f"Site Oranı: **{oran_2:.2f}**")
+                
+                if oran_2 > fair_2:
+                    deger = ((oran_2 * prob_2) - 1) * 100
+                    st.success(f"🔥 VALUE! (%{deger:.1f})")
+                    kelly = (((oran_2 * prob_2) - 1) / (oran_2 - 1)) * 0.5
+                    if kelly > 0:
+                        st.write(f"💵 Önerilen: **{int(kasa * kelly)} TL**")
+                else:
+                    st.error("Değersiz")
 
             st.divider()
             
-            # SEKMELER
-            tab1, tab2, tab3 = st.tabs(["🏆 Maç Sonucu", "🔄 İY / MS", "🥅 Alt / Üst & Skor"])
+            # DİĞER TAHMİNLER (TABLO HALİNDE)
+            t1, t2 = st.tabs(["📊 SKOR & ALT/ÜST", "🔄 İY / MS"])
             
-            with tab1:
-                p1 = (ms_sayac['1']/5000)
-                p0 = (ms_sayac['0']/5000)
-                p2 = (ms_sayac['2']/5000)
+            with t1:
+                c_a, c_b = st.columns(2)
+                c_a.metric("2.5 ÜST Olasılığı", f"%{(alt_ust['UST']/sim_sayisi)*100:.1f}")
+                c_b.metric("2.5 ALT Olasılığı", f"%{(alt_ust['ALT']/sim_sayisi)*100:.1f}")
                 
-                c1, c2, c3 = st.columns(3)
-                c1.success(f"EV: %{p1*100:.1f}")
-                c2.warning(f"BER: %{p0*100:.1f}")
-                c3.error(f"DEP: %{p2*100:.1f}")
-                
-                st.progress(p1, text="Ev Sahibi")
-                st.progress(p0, text="Berabere")
-                st.progress(p2, text="Deplasman")
-
-            with tab2:
-                sirali_iyms = sorted(iy_ms_sayac.items(), key=lambda x: x[1], reverse=True)[:5]
-                df_iyms = pd.DataFrame(sirali_iyms, columns=['Tahmin', 'Sayı'])
-                df_iyms['Olasılık %'] = (df_iyms['Sayı'] / 5000) * 100
-                st.dataframe(df_iyms[['Tahmin', 'Olasılık %']], hide_index=True, use_container_width=True)
-
-            with tab3:
-                c1, c2 = st.columns(2)
-                c1.metric("2.5 ÜST", f"%{(alt_ust_sayac['UST']/5000)*100:.1f}")
-                c2.metric("2.5 ALT", f"%{(alt_ust_sayac['ALT']/5000)*100:.1f}")
-                
-                st.write("🎯 **En Olası Skorlar:**")
-                sirali_skor = sorted(skor_sayac.items(), key=lambda x: x[1], reverse=True)[:3]
-                for s in sirali_skor:
-                    st.info(f"{s[0]} (Olasılık: %{(s[1]/5000)*100:.1f})")
+                st.write("**En Olası Skorlar:**")
+                sirali_skor = sorted(skor_sayac.items(), key=lambda x: x[1], reverse=True)[:5]
+                st.table(pd.DataFrame(sirali_skor, columns=["Skor", "Simülasyon Sayısı"]))
+            
+            with t2:
+                st.write("**İY / MS Tahminleri:**")
+                sirali_iy = sorted(iy_ms_sayac.items(), key=lambda x: x[1], reverse=True)[:5]
+                st.table(pd.DataFrame(sirali_iy, columns=["İY/MS", "Simülasyon Sayısı"]))
 
 else:
-    st.error("Veriler yüklenemedi.")
+    st.error("TFF Verileri Yüklenemedi. İnternet bağlantını kontrol et.")
